@@ -45,10 +45,19 @@
     </main>
 
     <footer class="actions">
-      <div class="score">当前得分：<span id="score-value">0</span> / 100</div>
+      <div class="score">
+        <div class="score-total">总分：<span id="score-total">0</span> / <span id="score-total-max">100</span></div>
+        <div class="score-breakdown">
+          单选 <span id="score-single">0</span> / <span id="score-single-max">0</span>
+          多选 <span id="score-multiple">0</span> / <span id="score-multiple-max">0</span>
+          名词解释 <span id="score-term">0</span> / <span id="score-term-max">0</span>
+          问答 <span id="score-short">0</span> / <span id="score-short-max">0</span>
+        </div>
+      </div>
       <div class="buttons">
         <button id="check-answers" class="primary">提交并查看答案</button>
         <button id="reset-answers" class="ghost">清空作答</button>
+        <button id="shuffle-questions" class="ghost">换一批</button>
       </div>
     </footer>
   </div>

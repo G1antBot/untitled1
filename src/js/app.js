@@ -1,20 +1,38 @@
-let questionBank = null;
+let questionPool = null;
 
 const scoreConfig = {
   single: 1,
   multiple: 2,
-  term: 2,
-  short: (100 - 50 - 10 - 20) / 3
+  term: 1,
+  short: 10
+};
+
+const displayConfig = {
+  single: 50,
+  multiple: 5,
+  term: 10,
+  short: 3
 };
 
 const tabButtons = document.querySelectorAll('[data-tab]');
 const panels = document.querySelectorAll('.tab-panel');
-const scoreOutput = document.querySelector('#score-value');
+const scoreTotalValue = document.querySelector('#score-total');
+const scoreTotalMax = document.querySelector('#score-total-max');
+const scoreSingleValue = document.querySelector('#score-single');
+const scoreSingleMax = document.querySelector('#score-single-max');
+const scoreMultipleValue = document.querySelector('#score-multiple');
+const scoreMultipleMax = document.querySelector('#score-multiple-max');
+const scoreTermValue = document.querySelector('#score-term');
+const scoreTermMax = document.querySelector('#score-term-max');
+const scoreShortValue = document.querySelector('#score-short');
+const scoreShortMax = document.querySelector('#score-short-max');
 const checkButton = document.querySelector('#check-answers');
 const resetButton = document.querySelector('#reset-answers');
+const shuffleButton = document.querySelector('#shuffle-questions');
 
 const state = {
-  answers: new Map()
+  answers: new Map(),
+  currentQuestions: {}
 };
 
 const normalize = (value) => {
@@ -24,6 +42,28 @@ const normalize = (value) => {
     .toLowerCase()
     .replace(/[\s\u3000\uFF01-\uFF65\u3001-\u303F.,;:!?、，。；：]/g, '')
     .trim();
+};
+
+const shuffle = (items) => {
+  const list = [...items];
+  for (let i = list.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+};
+
+const pickQuestions = (type, excludeItems = [], countOverride = null) => {
+  const pool = questionPool[type] || [];
+  const targetCount = countOverride ?? Math.min(displayConfig[type] ?? pool.length, pool.length);
+  const excludeSet = new Set(excludeItems);
+  let candidates = pool.filter((item) => !excludeSet.has(item));
+
+  if (candidates.length < targetCount) {
+    candidates = pool.slice();
+  }
+
+  return shuffle(candidates).slice(0, Math.min(targetCount, candidates.length));
 };
 
 const createOption = (type, name, option) => {
@@ -57,7 +97,7 @@ const createOption = (type, name, option) => {
 };
 
 const renderSection = (type, container) => {
-  const items = questionBank[type] || [];
+  const items = state.currentQuestions[type] || [];
   const sectionTitle = document.createElement('h2');
   sectionTitle.textContent = container.dataset.title;
   container.appendChild(sectionTitle);
@@ -111,15 +151,43 @@ const renderAll = () => {
   });
 };
 
+const updateScoreMax = () => {
+  const maxSingle = (state.currentQuestions.single || []).length * scoreConfig.single;
+  const maxMultiple = (state.currentQuestions.multiple || []).length * scoreConfig.multiple;
+  const maxTerm = (state.currentQuestions.term || []).length * scoreConfig.term;
+  const maxShort = (state.currentQuestions.short || []).length * scoreConfig.short;
+  const maxTotal = maxSingle + maxMultiple + maxTerm + maxShort;
+
+  scoreSingleMax.textContent = maxSingle.toFixed(1);
+  scoreMultipleMax.textContent = maxMultiple.toFixed(1);
+  scoreTermMax.textContent = maxTerm.toFixed(1);
+  scoreShortMax.textContent = maxShort.toFixed(1);
+  scoreTotalMax.textContent = maxTotal.toFixed(1);
+};
+
+const resetScoreValues = () => {
+  scoreSingleValue.textContent = '0';
+  scoreMultipleValue.textContent = '0';
+  scoreTermValue.textContent = '0';
+  scoreShortValue.textContent = '0';
+  scoreTotalValue.textContent = '0';
+};
+
 const checkAnswers = () => {
-  if (!questionBank) {
+  if (!questionPool) {
     return;
   }
   let totalScore = 0;
+  const scoreByType = {
+    single: 0,
+    multiple: 0,
+    term: 0,
+    short: 0
+  };
 
   panels.forEach((panel) => {
     const type = panel.dataset.type;
-    const items = questionBank[type] || [];
+    const items = state.currentQuestions[type] || [];
 
     items.forEach((item, idx) => {
       const name = `${type}-${idx}`;
@@ -135,11 +203,9 @@ const checkAnswers = () => {
         const answerSet = new Set(answer || []);
         correct = correctSet.size === answerSet.size && [...correctSet].every((v) => answerSet.has(v));
       } else {
-        const user = normalize(answer || '');
-        const key = normalize(item.answer || '');
-        if (user && key) {
-          correct = key.includes(user) || user.includes(key);
-        }
+        const user = (answer || '').trim();
+        const key = (item.answer || '').trim();
+        correct = Boolean(user && key && user === key);
       }
 
       feedback.textContent = `正确答案：${type === 'multiple' ? item.answer.join('、') : item.answer}`;
@@ -148,11 +214,16 @@ const checkAnswers = () => {
 
       if (correct) {
         totalScore += scoreConfig[type];
+        scoreByType[type] += scoreConfig[type];
       }
     });
   });
 
-  scoreOutput.textContent = totalScore.toFixed(1);
+  scoreSingleValue.textContent = scoreByType.single.toFixed(1);
+  scoreMultipleValue.textContent = scoreByType.multiple.toFixed(1);
+  scoreTermValue.textContent = scoreByType.term.toFixed(1);
+  scoreShortValue.textContent = scoreByType.short.toFixed(1);
+  scoreTotalValue.textContent = totalScore.toFixed(1);
 };
 
 const resetAnswers = () => {
@@ -172,7 +243,29 @@ const resetAnswers = () => {
       card.classList.remove('is-correct', 'is-wrong');
     });
   });
-  scoreOutput.textContent = '0';
+  resetScoreValues();
+};
+
+const replaceQuestionsForType = (type) => {
+  const panel = document.querySelector(`.tab-panel[data-type="${type}"]`);
+  if (!panel || !questionPool) {
+    return;
+  }
+
+  const currentItems = state.currentQuestions[type] || [];
+  const targetCount = currentItems.length || Math.min(displayConfig[type] ?? 0, (questionPool[type] || []).length);
+  state.currentQuestions[type] = pickQuestions(type, currentItems, targetCount);
+
+  Array.from(state.answers.keys()).forEach((key) => {
+    if (key.startsWith(`${type}-`)) {
+      state.answers.delete(key);
+    }
+  });
+
+  panel.innerHTML = '';
+  renderSection(type, panel);
+  updateScoreMax();
+  resetScoreValues();
 };
 
 const activateTab = (target) => {
@@ -196,8 +289,14 @@ const loadQuestions = async () => {
     if (!response.ok) {
       throw new Error('无法加载题库文件');
     }
-    questionBank = await response.json();
+    questionPool = await response.json();
+    panels.forEach((panel) => {
+      const type = panel.dataset.type;
+      state.currentQuestions[type] = pickQuestions(type);
+    });
     renderAll();
+    updateScoreMax();
+    resetScoreValues();
     activateTab('single');
   } catch (error) {
     const fallback = document.createElement('div');
@@ -209,5 +308,11 @@ const loadQuestions = async () => {
 
 checkButton.addEventListener('click', checkAnswers);
 resetButton.addEventListener('click', resetAnswers);
+shuffleButton.addEventListener('click', () => {
+  const activePanel = document.querySelector('.tab-panel.active');
+  if (activePanel) {
+    replaceQuestionsForType(activePanel.dataset.type);
+  }
+});
 
 loadQuestions();

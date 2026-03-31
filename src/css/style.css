@@ -165,8 +165,23 @@ body {
 }
 
 .score {
+  display: grid;
+  gap: 6px;
   font-size: 16px;
   font-weight: 600;
+}
+
+.score-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.score-breakdown span {
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .buttons {
