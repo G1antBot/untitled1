@@ -35,15 +35,6 @@ const state = {
   currentQuestions: {}
 };
 
-const normalize = (value) => {
-  if (!value) return '';
-  return value
-    .toString()
-    .toLowerCase()
-    .replace(/[\s\u3000\uFF01-\uFF65\u3001-\u303F.,;:!?、，。；：]/g, '')
-    .trim();
-};
-
 const shuffle = (items) => {
   const list = [...items];
   for (let i = list.length - 1; i > 0; i -= 1) {
