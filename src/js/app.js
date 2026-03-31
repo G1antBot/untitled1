@@ -128,9 +128,9 @@ const checkAnswers = () => {
       const answer = state.answers.get(name);
 
       let correct = false;
-      if (type === "single") {
+      if (type === 'single') {
         correct = answer === item.answer;
-      } else if (type === "multiple") {
+      } else if (type === 'multiple') {
         const correctSet = new Set(item.answer);
         const answerSet = new Set(answer || []);
         correct = correctSet.size === answerSet.size && [...correctSet].every((v) => answerSet.has(v));
@@ -142,7 +142,7 @@ const checkAnswers = () => {
         }
       }
 
-      feedback.textContent = `正确答案�?{type === 'multiple' ? item.answer.join('�?) : item.answer}`;
+      feedback.textContent = `正确答案：${type === 'multiple' ? item.answer.join('、') : item.answer}`;
       card.classList.remove('is-correct', 'is-wrong');
       card.classList.add(correct ? 'is-correct' : 'is-wrong');
 
