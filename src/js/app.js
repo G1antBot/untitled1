@@ -26,7 +26,7 @@ const normalize = (value) => {
     .trim();
 };
 
-const createOption = (type, name, option, index) => {
+const createOption = (type, name, option) => {
   const wrapper = document.createElement('label');
   wrapper.className = 'option';
 
@@ -80,8 +80,8 @@ const renderSection = (type, container) => {
     if (type === 'single' || type === 'multiple') {
       const list = document.createElement('div');
       list.className = 'option-list';
-      item.options.forEach((option, optionIndex) => {
-        list.appendChild(createOption(type === 'single' ? 'radio' : 'checkbox', name, option, optionIndex));
+      item.options.forEach((option) => {
+        list.appendChild(createOption(type === 'single' ? 'radio' : 'checkbox', name, option));
       });
       answerArea.appendChild(list);
     } else {
