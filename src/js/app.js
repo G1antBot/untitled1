@@ -27,7 +27,6 @@ const normalize = (value) => {
 };
 
 const createOption = (type, name, option, index) => {
-  const id = `${name}-${index}`;
   const wrapper = document.createElement('label');
   wrapper.className = 'option';
 
@@ -143,7 +142,7 @@ const checkAnswers = () => {
         }
       }
 
-      feedback.textContent = `正确答案：${type === 'multiple' ? item.answer.join('、') : item.answer}`;
+      feedback.textContent = `正确答案�?{type === 'multiple' ? item.answer.join('�?) : item.answer}`;
       card.classList.remove('is-correct', 'is-wrong');
       card.classList.add(correct ? 'is-correct' : 'is-wrong');
 
@@ -203,7 +202,7 @@ const loadQuestions = async () => {
   } catch (error) {
     const fallback = document.createElement('div');
     fallback.className = 'load-error';
-    fallback.textContent = '题库加载失败，请检查 questions.json 是否存在。';
+    fallback.textContent = '题库加载失败，请检�?questions.json 是否存在�?;
     document.body.appendChild(fallback);
   }
 };
