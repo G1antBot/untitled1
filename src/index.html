@@ -26,8 +26,15 @@
 
   <div class="page">
     <header class="hero">
-      <div class="brand">外科学总论复习</div>
-      <div class="subtitle">随机抽题（固定版） · 即时反馈 · 总分 100</div>
+      <div class="brand" id="brand-text">外科学总论复习</div>
+      <div class="subtitle" id="subtitle-text">随机抽题（固定版） · 即时反馈 · 总分 100</div>
+      <div class="subject-select">
+        <label for="subject-select">选择学科</label>
+        <select id="subject-select">
+          <option value="surgery">外科学总论</option>
+          <option value="diagnostics">诊断学（简答+论述）</option>
+        </select>
+      </div>
     </header>
 
     <nav class="tabs">
@@ -48,10 +55,10 @@
       <div class="score">
         <div class="score-total">总分：<span id="score-total">0</span> / <span id="score-total-max">100</span></div>
         <div class="score-breakdown">
-          单选 <span id="score-single">0</span> / <span id="score-single-max">0</span>
-          多选 <span id="score-multiple">0</span> / <span id="score-multiple-max">0</span>
-          名词解释 <span id="score-term">0</span> / <span id="score-term-max">0</span>
-          问答 <span id="score-short">0</span> / <span id="score-short-max">0</span>
+          <span class="score-item" id="score-item-single"><span id="score-label-single">单选</span> <span id="score-single">0</span> / <span id="score-single-max">0</span></span>
+          <span class="score-item" id="score-item-multiple"><span id="score-label-multiple">多选</span> <span id="score-multiple">0</span> / <span id="score-multiple-max">0</span></span>
+          <span class="score-item" id="score-item-term"><span id="score-label-term">名词解释</span> <span id="score-term">0</span> / <span id="score-term-max">0</span></span>
+          <span class="score-item" id="score-item-short"><span id="score-label-short">问答</span> <span id="score-short">0</span> / <span id="score-short-max">0</span></span>
         </div>
       </div>
       <div class="buttons">

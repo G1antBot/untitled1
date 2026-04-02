@@ -1,5 +1,44 @@
 let questionPool = null;
 
+const subjectConfig = {
+  surgery: {
+    title: '外科学总论复习',
+    subtitle: '随机抽题（固定版） · 即时反馈 · 总分 100',
+    file: 'js/questions.json',
+    enabledTypes: ['single', 'multiple', 'term', 'short'],
+    labels: {
+      single: '单选题',
+      multiple: '多选题',
+      term: '名词解释',
+      short: '问答题'
+    },
+    display: {
+      single: 50,
+      multiple: 5,
+      term: 10,
+      short: 3
+    }
+  },
+  diagnostics: {
+    title: '诊断学复习',
+    subtitle: '随机抽题 · 当前仅简答题与论述题',
+    file: 'js/questions_diagnostics.json',
+    enabledTypes: ['term', 'short'],
+    labels: {
+      single: '单选题',
+      multiple: '多选题',
+      term: '简答题',
+      short: '论述题'
+    },
+    display: {
+      single: 0,
+      multiple: 0,
+      term: 20,
+      short: 8
+    }
+  }
+};
+
 const scoreConfig = {
   single: 1,
   multiple: 2,
@@ -7,12 +46,14 @@ const scoreConfig = {
   short: 10
 };
 
-const displayConfig = {
+const defaultDisplayConfig = {
   single: 50,
   multiple: 5,
   term: 10,
   short: 3
 };
+
+let currentDisplayConfig = { ...defaultDisplayConfig };
 
 const tabButtons = document.querySelectorAll('[data-tab]');
 const panels = document.querySelectorAll('.tab-panel');
@@ -20,15 +61,26 @@ const scoreTotalValue = document.querySelector('#score-total');
 const scoreTotalMax = document.querySelector('#score-total-max');
 const scoreSingleValue = document.querySelector('#score-single');
 const scoreSingleMax = document.querySelector('#score-single-max');
+const scoreLabelSingle = document.querySelector('#score-label-single');
+const scoreItemSingle = document.querySelector('#score-item-single');
 const scoreMultipleValue = document.querySelector('#score-multiple');
 const scoreMultipleMax = document.querySelector('#score-multiple-max');
+const scoreLabelMultiple = document.querySelector('#score-label-multiple');
+const scoreItemMultiple = document.querySelector('#score-item-multiple');
 const scoreTermValue = document.querySelector('#score-term');
 const scoreTermMax = document.querySelector('#score-term-max');
+const scoreLabelTerm = document.querySelector('#score-label-term');
+const scoreItemTerm = document.querySelector('#score-item-term');
 const scoreShortValue = document.querySelector('#score-short');
 const scoreShortMax = document.querySelector('#score-short-max');
+const scoreLabelShort = document.querySelector('#score-label-short');
+const scoreItemShort = document.querySelector('#score-item-short');
 const checkButton = document.querySelector('#check-answers');
 const resetButton = document.querySelector('#reset-answers');
 const shuffleButton = document.querySelector('#shuffle-questions');
+const subjectSelect = document.querySelector('#subject-select');
+const brandText = document.querySelector('#brand-text');
+const subtitleText = document.querySelector('#subtitle-text');
 
 const state = {
   answers: new Map(),
@@ -46,7 +98,7 @@ const shuffle = (items) => {
 
 const pickQuestions = (type, excludeItems = [], countOverride = null) => {
   const pool = questionPool[type] || [];
-  const targetCount = countOverride ?? Math.min(displayConfig[type] ?? pool.length, pool.length);
+  const targetCount = countOverride ?? Math.min(currentDisplayConfig[type] ?? pool.length, pool.length);
   const excludeSet = new Set(excludeItems);
   let candidates = pool.filter((item) => !excludeSet.has(item));
 
@@ -137,9 +189,55 @@ const renderSection = (type, container) => {
 
 const renderAll = () => {
   panels.forEach((panel) => {
+    if (panel.classList.contains('is-hidden')) {
+      return;
+    }
     panel.innerHTML = '';
     renderSection(panel.dataset.type, panel);
   });
+};
+
+const getCurrentSubject = () => subjectSelect?.value || 'surgery';
+
+const getSubjectMeta = () => subjectConfig[getCurrentSubject()] || subjectConfig.surgery;
+
+const applySubjectMeta = () => {
+  const meta = getSubjectMeta();
+  currentDisplayConfig = { ...defaultDisplayConfig, ...meta.display };
+
+  brandText.textContent = meta.title;
+  subtitleText.textContent = meta.subtitle;
+
+  tabButtons.forEach((button) => {
+    const type = button.dataset.tab;
+    const enabled = meta.enabledTypes.includes(type);
+    button.classList.toggle('is-hidden', !enabled);
+    const label = meta.labels[type] || button.textContent;
+    const count = currentDisplayConfig[type] || 0;
+    button.textContent = `${label} ${count}`;
+  });
+
+  panels.forEach((panel) => {
+    const type = panel.dataset.type;
+    const enabled = meta.enabledTypes.includes(type);
+    panel.classList.toggle('is-hidden', !enabled);
+    panel.dataset.title = meta.labels[type] || panel.dataset.title;
+    if (!enabled) {
+      panel.classList.remove('active');
+      panel.innerHTML = '';
+    }
+  });
+
+  const compactLabel = (type) => (meta.labels[type] || '').replace(/题$/, '');
+  scoreLabelSingle.textContent = compactLabel('single') || '单选';
+  scoreLabelMultiple.textContent = compactLabel('multiple') || '多选';
+  scoreLabelTerm.textContent = compactLabel('term') || '名词解释';
+  scoreLabelShort.textContent = compactLabel('short') || '问答';
+
+  scoreItemSingle.classList.toggle('is-hidden', !meta.enabledTypes.includes('single'));
+  scoreItemMultiple.classList.toggle('is-hidden', !meta.enabledTypes.includes('multiple'));
+  scoreItemTerm.classList.toggle('is-hidden', !meta.enabledTypes.includes('term'));
+  scoreItemShort.classList.toggle('is-hidden', !meta.enabledTypes.includes('short'));
 };
 
 const updateScoreMax = () => {
@@ -199,11 +297,18 @@ const checkAnswers = () => {
         correct = Boolean(user && key && user === key);
       }
 
-      feedback.textContent = `正确答案：${type === 'multiple' ? item.answer.join('、') : item.answer}`;
-      card.classList.remove('is-correct', 'is-wrong');
-      card.classList.add(correct ? 'is-correct' : 'is-wrong');
+      const answerText = type === 'multiple' ? (item.answer || []).join('、') : (item.answer || '');
+      const hasReference = Boolean(answerText.trim());
 
-      if (correct) {
+      feedback.textContent = hasReference
+        ? `参考答案：${answerText}`
+        : '该题未提供标准答案，请结合教材自评。';
+      card.classList.remove('is-correct', 'is-wrong');
+      if (hasReference) {
+        card.classList.add(correct ? 'is-correct' : 'is-wrong');
+      }
+
+      if (hasReference && correct) {
         totalScore += scoreConfig[type];
         scoreByType[type] += scoreConfig[type];
       }
@@ -244,7 +349,7 @@ const replaceQuestionsForType = (type) => {
   }
 
   const currentItems = state.currentQuestions[type] || [];
-  const targetCount = currentItems.length || Math.min(displayConfig[type] ?? 0, (questionPool[type] || []).length);
+  const targetCount = currentItems.length || Math.min(currentDisplayConfig[type] ?? 0, (questionPool[type] || []).length);
   state.currentQuestions[type] = pickQuestions(type, currentItems, targetCount);
 
   Array.from(state.answers.keys()).forEach((key) => {
@@ -260,11 +365,15 @@ const replaceQuestionsForType = (type) => {
 };
 
 const activateTab = (target) => {
+  const meta = getSubjectMeta();
+  const firstEnabled = meta.enabledTypes[0];
+  const finalTarget = meta.enabledTypes.includes(target) ? target : firstEnabled;
+
   tabButtons.forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.tab === target);
+    btn.classList.toggle('active', btn.dataset.tab === finalTarget);
   });
   panels.forEach((panel) => {
-    panel.classList.toggle('active', panel.dataset.type === target);
+    panel.classList.toggle('active', panel.dataset.type === finalTarget);
   });
 };
 
@@ -276,19 +385,21 @@ tabButtons.forEach((button) => {
 
 const loadQuestions = async () => {
   try {
-    const response = await fetch('js/questions.json', { cache: 'no-store' });
+    const meta = getSubjectMeta();
+    const response = await fetch(meta.file, { cache: 'no-store' });
     if (!response.ok) {
       throw new Error('无法加载题库文件');
     }
     questionPool = await response.json();
+    state.answers.clear();
     panels.forEach((panel) => {
       const type = panel.dataset.type;
-      state.currentQuestions[type] = pickQuestions(type);
+      state.currentQuestions[type] = meta.enabledTypes.includes(type) ? pickQuestions(type) : [];
     });
     renderAll();
     updateScoreMax();
     resetScoreValues();
-    activateTab('single');
+    activateTab(meta.enabledTypes[0]);
   } catch (error) {
     const fallback = document.createElement('div');
     fallback.className = 'load-error';
@@ -306,4 +417,10 @@ shuffleButton.addEventListener('click', () => {
   }
 });
 
+subjectSelect.addEventListener('change', async () => {
+  applySubjectMeta();
+  await loadQuestions();
+});
+
+applySubjectMeta();
 loadQuestions();
