@@ -36,6 +36,24 @@ const subjectConfig = {
       term: 20,
       short: 8
     }
+  },
+  ebm: {
+    title: '循证医学复习',
+    subtitle: '随机抽题（固定版） · 包含单选、名词解释、简答、判断',
+    file: 'js/ebm_questions.json',
+    enabledTypes: ['single', 'term', 'short', 'judge'],
+    labels: {
+      single: '单选题',
+      term: '名词解释',
+      short: '简答题',
+      judge: '判断题'
+    },
+    display: {
+      single: 30,
+      term: 10,
+      short: 5,
+      judge: 10
+    }
   }
 };
 
@@ -43,14 +61,16 @@ const scoreConfig = {
   single: 1,
   multiple: 2,
   term: 1,
-  short: 10
+  short: 10,
+  judge: 1
 };
 
 const defaultDisplayConfig = {
   single: 50,
   multiple: 5,
   term: 10,
-  short: 3
+  short: 3,
+  judge: 5
 };
 
 let currentDisplayConfig = { ...defaultDisplayConfig };
@@ -75,6 +95,10 @@ const scoreShortValue = document.querySelector('#score-short');
 const scoreShortMax = document.querySelector('#score-short-max');
 const scoreLabelShort = document.querySelector('#score-label-short');
 const scoreItemShort = document.querySelector('#score-item-short');
+const scoreJudgeValue = document.querySelector('#score-judge');
+const scoreJudgeMax = document.querySelector('#score-judge-max');
+const scoreLabelJudge = document.querySelector('#score-label-judge');
+const scoreItemJudge = document.querySelector('#score-item-judge');
 const checkButton = document.querySelector('#check-answers');
 const resetButton = document.querySelector('#reset-answers');
 const shuffleButton = document.querySelector('#shuffle-questions');
@@ -160,11 +184,12 @@ const renderSection = (type, container) => {
 
     const name = `${type}-${idx}`;
 
-    if (type === 'single' || type === 'multiple') {
+    if (type === 'single' || type === 'multiple' || type === 'judge') {
       const list = document.createElement('div');
       list.className = 'option-list';
-      item.options.forEach((option) => {
-        list.appendChild(createOption(type === 'single' ? 'radio' : 'checkbox', name, option));
+      const options = item.options || (type === 'judge' ? ['√', '×'] : []);
+      options.forEach((option) => {
+        list.appendChild(createOption(type === 'multiple' ? 'checkbox' : 'radio', name, option));
       });
       answerArea.appendChild(list);
     } else {
@@ -233,11 +258,13 @@ const applySubjectMeta = () => {
   scoreLabelMultiple.textContent = compactLabel('multiple') || '多选';
   scoreLabelTerm.textContent = compactLabel('term') || '名词解释';
   scoreLabelShort.textContent = compactLabel('short') || '问答';
+  scoreLabelJudge.textContent = compactLabel('judge') || '判断';
 
   scoreItemSingle.classList.toggle('is-hidden', !meta.enabledTypes.includes('single'));
   scoreItemMultiple.classList.toggle('is-hidden', !meta.enabledTypes.includes('multiple'));
   scoreItemTerm.classList.toggle('is-hidden', !meta.enabledTypes.includes('term'));
   scoreItemShort.classList.toggle('is-hidden', !meta.enabledTypes.includes('short'));
+  scoreItemJudge.classList.toggle('is-hidden', !meta.enabledTypes.includes('judge'));
 };
 
 const updateScoreMax = () => {
@@ -245,12 +272,14 @@ const updateScoreMax = () => {
   const maxMultiple = (state.currentQuestions.multiple || []).length * scoreConfig.multiple;
   const maxTerm = (state.currentQuestions.term || []).length * scoreConfig.term;
   const maxShort = (state.currentQuestions.short || []).length * scoreConfig.short;
-  const maxTotal = maxSingle + maxMultiple + maxTerm + maxShort;
+  const maxJudge = (state.currentQuestions.judge || []).length * scoreConfig.judge;
+  const maxTotal = maxSingle + maxMultiple + maxTerm + maxShort + maxJudge;
 
   scoreSingleMax.textContent = maxSingle.toFixed(1);
   scoreMultipleMax.textContent = maxMultiple.toFixed(1);
   scoreTermMax.textContent = maxTerm.toFixed(1);
   scoreShortMax.textContent = maxShort.toFixed(1);
+  scoreJudgeMax.textContent = maxJudge.toFixed(1);
   scoreTotalMax.textContent = maxTotal.toFixed(1);
 };
 
@@ -259,6 +288,7 @@ const resetScoreValues = () => {
   scoreMultipleValue.textContent = '0';
   scoreTermValue.textContent = '0';
   scoreShortValue.textContent = '0';
+  scoreJudgeValue.textContent = '0';
   scoreTotalValue.textContent = '0';
 };
 
@@ -266,60 +296,63 @@ const checkAnswers = () => {
   if (!questionPool) {
     return;
   }
-  let totalScore = 0;
-  const scoreByType = {
-    single: 0,
-    multiple: 0,
-    term: 0,
-    short: 0
-  };
+  const activePanel = document.querySelector('.tab-panel.active');
+  if (!activePanel) {
+    return;
+  }
 
-  panels.forEach((panel) => {
-    const type = panel.dataset.type;
-    const items = state.currentQuestions[type] || [];
+  const type = activePanel.dataset.type;
+  const items = state.currentQuestions[type] || [];
+  let scoreForType = 0;
 
-    items.forEach((item, idx) => {
-      const name = `${type}-${idx}`;
-      const feedback = panel.querySelector(`.feedback[data-name="${name}"]`);
-      const card = feedback.closest('.question-card');
-      const answer = state.answers.get(name);
+  items.forEach((item, idx) => {
+    const name = `${type}-${idx}`;
+    const feedback = activePanel.querySelector(`.feedback[data-name="${name}"]`);
+    if (!feedback) return;
+    const card = feedback.closest('.question-card');
+    const answer = state.answers.get(name);
 
-      let correct = false;
-      if (type === 'single') {
-        correct = answer === item.answer;
-      } else if (type === 'multiple') {
-        const correctSet = new Set(item.answer);
-        const answerSet = new Set(answer || []);
-        correct = correctSet.size === answerSet.size && [...correctSet].every((v) => answerSet.has(v));
-      } else {
-        const user = (answer || '').trim();
-        const key = (item.answer || '').trim();
-        correct = Boolean(user && key && user === key);
-      }
+    let correct = false;
+    if (type === 'single' || type === 'judge') {
+      correct = answer === item.answer;
+    } else if (type === 'multiple') {
+      const correctSet = new Set(item.answer);
+      const answerSet = new Set(answer || []);
+      correct = correctSet.size === answerSet.size && [...correctSet].every((v) => answerSet.has(v));
+    } else {
+      const user = (answer || '').trim();
+      const key = (item.answer || '').trim();
+      correct = Boolean(user && key && user === key);
+    }
 
-      const answerText = type === 'multiple' ? (item.answer || []).join('、') : (item.answer || '');
-      const hasReference = Boolean(answerText.trim());
+    const answerText = type === 'multiple' ? (item.answer || []).join('、') : (item.answer || '');
+    const hasReference = Boolean(answerText.trim());
 
-      feedback.textContent = hasReference
-        ? `参考答案：${answerText}`
-        : '该题未提供标准答案，请结合教材自评。';
-      card.classList.remove('is-correct', 'is-wrong');
-      if (hasReference) {
-        card.classList.add(correct ? 'is-correct' : 'is-wrong');
-      }
+    feedback.textContent = hasReference
+      ? `参考答案：${answerText}`
+      : '该题未提供标准答案，请结合教材自评。';
+    card.classList.remove('is-correct', 'is-wrong');
+    if (hasReference) {
+      card.classList.add(correct ? 'is-correct' : 'is-wrong');
+    }
 
-      if (hasReference && correct) {
-        totalScore += scoreConfig[type];
-        scoreByType[type] += scoreConfig[type];
-      }
-    });
+    if (hasReference && correct) {
+      scoreForType += scoreConfig[type];
+    }
   });
 
-  scoreSingleValue.textContent = scoreByType.single.toFixed(1);
-  scoreMultipleValue.textContent = scoreByType.multiple.toFixed(1);
-  scoreTermValue.textContent = scoreByType.term.toFixed(1);
-  scoreShortValue.textContent = scoreByType.short.toFixed(1);
-  scoreTotalValue.textContent = totalScore.toFixed(1);
+  if (type === 'single') scoreSingleValue.textContent = scoreForType.toFixed(1);
+  if (type === 'multiple') scoreMultipleValue.textContent = scoreForType.toFixed(1);
+  if (type === 'term') scoreTermValue.textContent = scoreForType.toFixed(1);
+  if (type === 'short') scoreShortValue.textContent = scoreForType.toFixed(1);
+  if (type === 'judge') scoreJudgeValue.textContent = scoreForType.toFixed(1);
+
+  const total = parseFloat(scoreSingleValue.textContent || 0) + 
+                parseFloat(scoreMultipleValue.textContent || 0) + 
+                parseFloat(scoreTermValue.textContent || 0) + 
+                parseFloat(scoreShortValue.textContent || 0) + 
+                parseFloat(scoreJudgeValue.textContent || 0);
+  scoreTotalValue.textContent = total.toFixed(1);
 };
 
 const resetAnswers = () => {
